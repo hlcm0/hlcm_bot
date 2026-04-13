@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hlcm-bot"
+version = "0.1.0"
+description = "A NoneBot 2 bot."
+readme = "README.md"
+requires-python = ">=3.10,<4.0"
+dependencies = [
+    "nonebot2[fastapi]",
+    "nonebot-adapter-onebot",
+    "nonebot-plugin-apscheduler",
+    "nonebot-plugin-localstore",
+    "nonebot-plugin-orm[sqlite]",
+    "aiohttp",
+    "beautifulsoup4",
+    "httpx",
+    "kbinxml",
+    "moviepy",
+    "numpy",
+    "onnxruntime",
+    "openai",
+    "opencc-python-reimplemented",
+    "opencv-python-headless",
+    "pillow",
+    "pycryptodome",
+    "pykakasi",
+    "rapidfuzz",
+    "requests",
+]
+
+[project.optional-dependencies]
+dev = [
+    "alembic",
+    "sqlalchemy",
+    "tqdm",
+]
+
+[tool.setuptools]
+py-modules = []
+
+[tool.nonebot]
+plugin_dirs = ["src/plugins"]
+builtin_plugins = []
+[tool.nonebot.plugins]
+"@local" = []
+nonebot-plugin-orm = ["nonebot_plugin_orm"]
+
+
+[tool.nonebot.adapters]
+"@local" = []
+nonebot-adapter-onebot = [{name = "OneBot V11", module_name = "nonebot.adapters.onebot.v11"}]
