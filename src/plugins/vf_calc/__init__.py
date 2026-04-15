@@ -1,10 +1,15 @@
+from pydantic import BaseModel, Field
+
 from nonebot import get_plugin_config
 from nonebot.plugin import PluginMetadata
 from nonebot import on_command
 from nonebot.params import CommandArg
-from nonebot.adapters.onebot.v11 import Message, Event, GroupMessageEvent
+from nonebot.adapters.onebot.v11 import Message
 
+from ..ai_agent.registry import register_tool
+from ..ai_agent.types import ToolExecutionContext, ToolSpec
 from .config import Config
+from .service import calculate_vf_message
 
 __plugin_meta__ = PluginMetadata(
     name="vf_calc",
@@ -13,75 +18,64 @@ __plugin_meta__ = PluginMetadata(
     config=Config,
 )
 
-config = get_plugin_config(Config)
+try:
+    config = get_plugin_config(Config)
+except ValueError:
+    config = Config()
 
-vf_calc = on_command("vfc", priority=5, block=True)
 
-def get_grade_factor(score: int) -> float:
-    if score >= 9900000:
-        return 1.05
-    elif score >= 9800000:
-        return 1.02
-    elif score >= 9700000:
-        return 1.00
-    elif score >= 9500000:
-        return 0.97
-    elif score >= 9300000:
-        return 0.94
-    elif score >= 9000000:
-        return 0.91
-    elif score >= 8700000:
-        return 0.88
-    elif score >= 7500000:
-        return 0.85
-    elif score >= 6500000:
-        return 0.82
-    else:
-        return 0.80
+class VfCalcToolArgs(BaseModel):
+    level: float = Field(description="谱面等级，范围 1 到 21")
+    score: str = Field(description="分数，可传完整分数如 9987654，也可传 puc")
 
-def calc_vf(level: int, score: int, grade_factor: float, clear_factor: float) -> float:
-    return int(level * (score / 10000000.0) * grade_factor * clear_factor * 20) / 20
 
-@vf_calc.handle()
-async def handle_vf(event: Event, args: Message = CommandArg()):
-    # 获取参数
-    args_list = args.extract_plain_text().strip().split()
-    
-    # 检查参数数量
-    if len(args_list) != 2:
-        await vf_calc.finish("用法：/vfc [等级] [分数]")
-        return
+async def vf_calc_tool_handler(
+    args: dict[str, str],
+    context: ToolExecutionContext,
+) -> str:
+    _ = context
+    level = float(args["level"])
+    score = str(args["score"])
+    return calculate_vf_message(level, score)
 
-    try:
-        # 转换参数为数字并计算
-        if args_list[1] == 'puc' or args_list[1] == 'PUC':
-            score = 10000000
-        else:
-            score = int(args_list[1])
-        level = float(args_list[0])
-        
-        if level < 1 or level > 21:
-            await vf_calc.finish("等级应当在1-21之间")
-        if score < 0 or score > 10000000:
-            await vf_calc.finish("分数应当在0-10000000之间")
-        if score <= 1000:
-            score *= 10000
-        
-        grade_factor = get_grade_factor(score)
-        
-        puc_vf = calc_vf(level, score, grade_factor, 1.10)
-        uc_vf = calc_vf(level, score, grade_factor, 1.06)
-        mc_vf = calc_vf(level, score, grade_factor, 1.04)
-        hc_vf = calc_vf(level, score, grade_factor, 1.02)
-        ec_vf = calc_vf(level, score, grade_factor, 1.00)
-        tc_vf = calc_vf(level, score, grade_factor, 0.50)
 
-        if score == 10000000:
-            await vf_calc.finish(f"PUC: {puc_vf}")
-        elif score >= 5000000:
-            await vf_calc.finish(f"UC: {uc_vf}\nMAXXIVE: {mc_vf}\nHARD: {hc_vf}\nEASY: {ec_vf}\nCRASH: {tc_vf}")
-        else:
-            await vf_calc.finish(f"MAXXIVE: {mc_vf}\nHARD: {hc_vf}\nEASY: {ec_vf}\nCRASH: {tc_vf}")
+register_tool(
+    ToolSpec(
+        name="vf_calc.calculate",
+        description="\
+            计算 SOUND VOLTEX 单曲 VF，返回不同通关状态下的 VF 结果,\
+                PUC(perfect ultimate chain)代表满分通关，\
+                UC(ultimate chain)代表没有miss，\
+                MAXXIVE(别名：白灯、mc)、HARD(别名：紫灯、hc)、EASY(别名：绿灯、ec)分别代表不同类型的血条，\
+                CRASH代表不通过。\
+                10000000分肯定PUC，但是其他通关状态无法从分数直接判断。\
+                1000以下的分数会自动乘以10000。",
+        handler=vf_calc_tool_handler,
+        args_schema=VfCalcToolArgs,
+    )
+)
 
-    except ValueError:
-        await vf_calc.finish("看不懂捏")
+try:
+    vf_calc = on_command("vfc", priority=5, block=True)
+
+    @vf_calc.handle()
+    async def handle_vf(args: Message = CommandArg()):
+        if vf_calc is None:
+            return
+        args_list = args.extract_plain_text().strip().split()
+
+        if len(args_list) != 2:
+            await vf_calc.finish("用法：/vfc [等级] [分数]")
+            return
+
+        try:
+            level = float(args_list[0])
+            result = calculate_vf_message(level, args_list[1])
+        except ValueError as exception:
+            message = str(exception).strip() or "看不懂捏"
+            await vf_calc.finish(message)
+            return
+
+        await vf_calc.finish(result)
+except ValueError:
+    vf_calc = None
