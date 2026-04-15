@@ -8,6 +8,7 @@ QQ机器人。
 - 适配器：OneBot V11
 - Bot协议端：Napcat
 - 功能：
+    - `@机器人` 触发的 LangGraph AI Agent
     - SDVX 曲目和谱面查询
     - 定时推送指定账号的 Twitter 推文
     - 解析 Twitter 视频链接并发送视频
@@ -26,11 +27,11 @@ hlcm_bot/
 ├── .env
 └── src/
     └── plugins/
+        ├── ai_agent/
         ├── auto_response/
         ├── github_release_downloader/
         ├── hlcm_response/
         ├── nitter_news/
-        ├── question_and_answer/
         ├── sdvx_chart/
         ├── sdvx_score_export/
         ├── sdvxlog/
@@ -112,6 +113,15 @@ docker run -d \
 
 之后请按照[NapCat文档-接入框架](https://napneko.github.io/use/integration)的说明将NapCat连接到NoneBot。
 
+## AI Agent
+
+`ai_agent` 插件基于 LangGraph
+
+- 触发方式：在群聊或私聊里 `@机器人` 并附带自然语言问题
+- 当前限制：只有单轮记忆，插件暂时只接入了vf_calc
+
+后续其他插件如需接入 Agent，请显式依赖 `src/plugins/ai_agent/registry.py` 中暴露的注册接口，先把业务逻辑抽成普通 async service，再通过 `ToolSpec` 注册到 registry。
+
 ## 相关依赖
 
 ### 1.外部资源
@@ -154,6 +164,20 @@ docker run -d \
 | `DRIVER` | NoneBot 驱动配置，当前项目使用 `~fastapi+~httpx+~websockets` |
 | `SUPERUSERS` | 机器人管理员 QQ 号列表 |
 | `ONEBOT_ACCESS_TOKEN` | OneBot 连接令牌 |
+
+### `ai_agent`
+
+说明：LangGraph AI Agent 插件相关配置
+
+| 配置项 | 必填 | 说明 |
+| --- | --- | --- |
+| `AI_AGENT__ENABLED` | 否 | 是否启用 AI Agent，默认 `false` |
+| `AI_AGENT__API_KEY` | 是 | OpenRouter API Key |
+| `AI_AGENT__MODEL` | 是 | OpenRouter 模型名 |
+| `AI_AGENT__BASE_URL` | 否 | OpenRouter 兼容接口地址 |
+| `AI_AGENT__TEMPERATURE` | 否 | 模型采样温度 |
+| `AI_AGENT__MAX_TOKENS` | 否 | 最大输出 token 数 |
+| `AI_AGENT__SYSTEM_PROMPT` | 否 | Agent 的系统提示词 |
 
 ### `sdvx_chart`
 
