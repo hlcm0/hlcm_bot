@@ -13,8 +13,6 @@ QQ机器人。
     - 定时推送指定账号的 Twitter 推文
     - 解析 Twitter 视频链接并发送视频
     - 氧无插件更新推送
-    - 问答库
-    - 群友发消息时自动敲ta
     - SDVX 私网存档导出(推荐使用[hlcm.top](https://hlcm.top)，机器人侧功能停止维护)
     - SDVX VF 计算
 
@@ -28,7 +26,6 @@ hlcm_bot/
 └── src/
     └── plugins/
         ├── ai_agent/
-        ├── auto_response/
         ├── github_release_downloader/
         ├── hlcm_response/
         ├── nitter_news/
