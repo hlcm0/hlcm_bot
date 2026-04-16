@@ -114,8 +114,8 @@ docker run -d \
 
 `ai_agent` 插件基于 LangGraph
 
-- 触发方式：在群聊或私聊里 `@机器人` 并附带自然语言问题
-- 当前限制：只有单轮记忆，插件暂时只接入了vf_calc
+- 触发方式：在群聊或私聊里 `@机器人` 并附带自然语言问题，如果需要上下文记忆，则需使用回复消息
+- 当前限制：插件暂时只接入了vf_calc
 
 后续其他插件如需接入 Agent，请显式依赖 `src/plugins/ai_agent/registry.py` 中暴露的注册接口，先把业务逻辑抽成普通 async service，再通过 `ToolSpec` 注册到 registry。
 
@@ -171,10 +171,13 @@ docker run -d \
 | `AI_AGENT__ENABLED` | 否 | 是否启用 AI Agent，默认 `false` |
 | `AI_AGENT__API_KEY` | 是 | OpenRouter API Key |
 | `AI_AGENT__MODEL` | 是 | OpenRouter 模型名 |
+| `AI_AGENT__SAFEGUARD_MODEL` | 是 | 用于内容安全检测的模型名，建议使用小模型以节省资源和加快响应 |
 | `AI_AGENT__BASE_URL` | 否 | OpenRouter 兼容接口地址 |
 | `AI_AGENT__TEMPERATURE` | 否 | 模型采样温度 |
 | `AI_AGENT__MAX_TOKENS` | 否 | 最大输出 token 数 |
 | `AI_AGENT__SYSTEM_PROMPT` | 否 | Agent 的系统提示词 |
+| `AI_AGENT__FIRST_AI_MESSAGE` | 否 | Agent 在没有上下文时的第一条消息内容 |
+| `AI_AGENT__MAXIMUM_CONTEXT_WINDOW` | 否 | 回复消息最大回溯条数，默认 20 条 |
 
 ### `sdvx_chart`
 

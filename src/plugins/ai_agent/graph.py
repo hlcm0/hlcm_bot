@@ -8,22 +8,82 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 from nonebot.log import logger
+from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, MessageEvent
+from nonebot.compat import type_validate_python
+from nonebot.adapters.onebot.v11 import Message
 
 from .registry import can_execute_tool, get_args_schema, list_tools
 from .types import AgentState, ToolExecutionContext
 from .safety import ANTI_POLITICAL_POLICY, ANTI_SEXUAL_POLICY
 
+async def _get_reply_message_id(bot: Bot, message: dict[str, Any]) -> int | None:
+    message_object = message.get("message", None)
+    if message_object is None:
+        return None
+    for segment in message_object:
+        if segment.get("type") == "reply":
+            reply_id = segment.get("data",{}).get("id", None)
+            if reply_id is not None:
+                try:
+                    reply_id = int(reply_id)
+                except ValueError:
+                    logger.warning(f"消息 {message} 的 reply id {reply_id} 不是有效的整数")
+                    return None
+                return reply_id
+    return None
+        
 
-def build_initial_messages(
-    input_text: str,
+async def build_initial_messages(
+    bot: Bot,
+    event: MessageEvent,
     system_prompt: str,
     first_ai_message: str,
-    context: ToolExecutionContext,
-) -> list[BaseMessage]:
+    maximum_context_window: int,
+) -> list[BaseMessage] | None:
+    bot_id = bot.self_id
+    message_id = event.message_id
+    message_list: list[BaseMessage] = []
+    while len(message_list) < maximum_context_window:
+        message = await bot.get_msg(message_id=message_id)
+        if not message:
+            logger.warning(f"消息 ID {message_id} 不存在，无法获取消息内容。")
+            return None
+        sender = message.get("sender", None)
+        if not sender:
+            logger.warning(f"消息 ID {message_id} 没有 sender 字段，无法判断发送者。")
+            return None
+        user_id = sender.get("user_id", None)
+        if not user_id:
+            logger.warning(f"消息 ID {message_id} 的 sender 字段没有 user_id，无法判断发送者。")
+            return None
+        user_id = str(user_id)
+        nickname = sender.get("nickname", "")
+        if not nickname:
+            logger.warning(f"消息 ID {message_id} 的 sender 字段没有 nickname，使用QQ号 {user_id} 代替。")
+            nickname = f"用户{user_id}"
+        message_segment_list = message.get("message", None)
+        if not message_segment_list:
+            logger.warning(f"消息 ID {message_id} 没有 message 字段，无法获取消息内容。")
+            return None
+        message_object = type_validate_python(Message, message_segment_list)
+        plain_text = message_object.extract_plain_text()
+        if not plain_text:
+            logger.warning(f"消息 ID {message_id} 的 message 字段无法提取纯文本，使用空字符串代替。")
+            plain_text = ""
+        if user_id == bot_id:
+            message_list.append(AIMessage(content=plain_text))
+        else:
+            message_list.append(HumanMessage(content=f"{nickname}: {plain_text}"))
+        
+        message_id = await _get_reply_message_id(bot, message)
+        if not message_id:
+            break
+
     return [
         SystemMessage(
             content=(
                 f"{system_prompt}\n"
+                "用户的消息格式为“昵称: 消息内容”。"
                 "如需获取结果，优先调用工具。"
                 "工具返回后请结合结果继续判断是否还需要调用其他工具，多次充分获取信息后，再回答。"
                 "总结输出工具结果时，要全面，不要省略细节，不要删改。"
@@ -33,8 +93,7 @@ def build_initial_messages(
             )
         ),
         AIMessage(content=first_ai_message),
-        HumanMessage(content=input_text),
-    ]
+    ] + message_list[::-1]
 
 
 class GraphState(AgentState):

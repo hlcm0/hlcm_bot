@@ -69,7 +69,7 @@ class AiAgentRuntime:
     async def run(self, bot: Bot, event: MessageEvent) -> str | None:
         if not self.config.enabled:
             return None
-
+        
         text = event.get_plaintext().strip()
         if not text:
             return "可以直接 @我 然后告诉我你的问题。"
@@ -78,11 +78,15 @@ class AiAgentRuntime:
             context = self._build_context(bot, event)
             tools = build_graph_tools(context)
             app = build_agent_graph(self._get_llm(), self._get_safeguard_llm(), tools)
+            messages = await build_initial_messages(bot, event, self.config.system_prompt, self.config.first_ai_message, self.config.maximum_context_window)
+            if messages is None:
+                return "构建消息记录失败了，请稍后再试。"
             state: AgentState = {
                 "context": context,
                 "available_tools": [tool.name for tool in list_tools() if tool.enabled],
-                "messages": build_initial_messages(text, self.config.system_prompt, self.config.first_ai_message, context),
+                "messages": messages,
             }
+            logger.info(messages)
             result = await app.ainvoke(state)
         except AgentConfigurationError:
             return "AI Agent 配置不完整，暂时无法使用。"

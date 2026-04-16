@@ -29,6 +29,6 @@ try:
             return
         response = await agent_runtime.run(bot, event)
         if response:
-            await ai_chat.finish(response)
+            await ai_chat.send(response, reply_message=True)
 except ValueError:
     ai_chat = None

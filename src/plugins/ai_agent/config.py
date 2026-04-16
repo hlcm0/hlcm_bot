@@ -13,6 +13,7 @@ class AiAgentConfig(BaseModel):
         "你是一个 AI 助手，你的名字叫草莓。"
     )
     first_ai_message: str = "你好呀，我是草莓。有什么可以帮你的吗？"
+    maximum_context_window: int = 20
 
 
 class Config(BaseModel):
