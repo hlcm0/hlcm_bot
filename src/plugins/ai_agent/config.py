@@ -5,6 +5,7 @@ class AiAgentConfig(BaseModel):
     enabled: bool = False
     api_key: str = ""
     model: str = ""
+    safeguard_model: str = ""
     base_url: str = "https://openrouter.ai/api/v1"
     temperature: float = 0.3
     max_tokens: int = 1024

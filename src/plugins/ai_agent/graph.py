@@ -11,6 +11,7 @@ from nonebot.log import logger
 
 from .registry import can_execute_tool, get_args_schema, list_tools
 from .types import AgentState, ToolExecutionContext
+from .safety import ANTI_POLITICAL_POLICY, ANTI_SEXUAL_POLICY
 
 
 def build_initial_messages(
@@ -38,6 +39,8 @@ def build_initial_messages(
 
 class GraphState(AgentState):
     messages: Annotated[list[Any], add_messages]
+    political_detected: bool
+    sexual_detected: bool
 
 
 def build_graph_tools(context: ToolExecutionContext) -> list[StructuredTool]:
@@ -78,27 +81,64 @@ def build_graph_tools(context: ToolExecutionContext) -> list[StructuredTool]:
     return tools
 
 
-def should_continue(state: GraphState) -> str:
-    last_message = state["messages"][-1]
-    if isinstance(last_message, AIMessage) and getattr(last_message, "tool_calls", None):
-        return "tool"
-    return "end"
-
-
-def build_agent_graph(llm: Any, tools: list[StructuredTool]) -> Any:
+def build_agent_graph(llm: Any, safeguard_llm: Any, tools: list[StructuredTool]) -> Any:
     model = llm.bind_tools(tools) if tools else llm
+
+    async def political_detector(state: GraphState) -> dict[str, bool]:
+        messages = [
+            SystemMessage(content=ANTI_POLITICAL_POLICY),
+            state["messages"][-1],
+        ]
+        response = await safeguard_llm.ainvoke(messages)
+        logger.info(f"政治检测结果: {response.content}")
+        return {"political_detected": "1" in response.content}
+    
+    async def sexual_detector(state: GraphState) -> dict[str, bool]:
+        messages = [
+            SystemMessage(content=ANTI_SEXUAL_POLICY),
+            state["messages"][-1],
+        ]
+        response = await safeguard_llm.ainvoke(messages)
+        logger.info(f"色情检测结果: {response.content}")
+        return {"sexual_detected": "1" in response.content}
+    
+    async def should_continue_process(state: GraphState) -> str:
+        if state["political_detected"]:
+            return "end"
+        if state["sexual_detected"]:
+            return "end"
+        return "continue"
 
     async def model_call(state: GraphState) -> dict[str, list[Any]]:
         response = await model.ainvoke(state["messages"])
         return {"messages": [response]}
+    
+    def should_continue_tool(state: GraphState) -> str:
+        last_message = state["messages"][-1]
+        if isinstance(last_message, AIMessage) and getattr(last_message, "tool_calls", None):
+            return "tool"
+        return "end"
 
     graph = StateGraph(GraphState)
+    graph.add_node("political_detector", political_detector)
+    graph.add_node("sexual_detector", sexual_detector)
+    graph.add_node("router", lambda state: state)
     graph.add_node("our_agent", model_call)
     graph.add_node("tools", ToolNode(tools=tools))
-    graph.add_edge(START, "our_agent")
+    graph.add_edge(START, "political_detector")
+    graph.add_edge(START, "sexual_detector")
+    graph.add_edge(["political_detector", "sexual_detector"], "router")
+    graph.add_conditional_edges(
+        "router",
+        should_continue_process,
+        {
+            "continue": "our_agent",
+            "end": END,
+        },
+    )
     graph.add_conditional_edges(
         "our_agent",
-        should_continue,
+        should_continue_tool,
         {
             "tool": "tools",
             "end": END,

@@ -9,7 +9,7 @@ from nonebot.log import logger
 
 from .config import AiAgentConfig
 from .graph import build_agent_graph, build_graph_tools, build_initial_messages
-from .llm import AgentConfigurationError, build_chat_model
+from .llm import AgentConfigurationError, build_chat_model, build_safeguard_model
 from .registry import list_tools
 from .types import AgentState, ToolExecutionContext
 
@@ -41,11 +41,17 @@ class AiAgentRuntime:
     def __init__(self, config: AiAgentConfig) -> None:
         self.config = config
         self._llm = None
+        self._safeguard_llm = None
 
     def _get_llm(self):
         if self._llm is None:
             self._llm = build_chat_model(self.config)
         return self._llm
+    
+    def _get_safeguard_llm(self):
+        if self._safeguard_llm is None:
+            self._safeguard_llm = build_safeguard_model(self.config)
+        return self._safeguard_llm
 
     def _build_context(self, bot: Bot, event: MessageEvent) -> ToolExecutionContext:
         superusers = {str(item) for item in getattr(get_driver().config, "superusers", set())}
@@ -71,7 +77,7 @@ class AiAgentRuntime:
         try:
             context = self._build_context(bot, event)
             tools = build_graph_tools(context)
-            app = build_agent_graph(self._get_llm(), tools)
+            app = build_agent_graph(self._get_llm(), self._get_safeguard_llm(), tools)
             state: AgentState = {
                 "context": context,
                 "available_tools": [tool.name for tool in list_tools() if tool.enabled],
@@ -84,6 +90,10 @@ class AiAgentRuntime:
             logger.exception(f"AI Agent 运行过程中出现错误: {exception}")
             return "AI Agent 运行过程中出现错误，请稍后再试。"
 
+        if result["political_detected"]:
+            return "抱歉，您的消息中包含政治敏感内容，无法生成回复。"
+        if result["sexual_detected"]:
+            return "抱歉，您的消息中包含色情内容，无法生成回复。"
         messages = result.get("messages", [])
         if not messages:
             return "回复生成失败了，请稍后再试。"
