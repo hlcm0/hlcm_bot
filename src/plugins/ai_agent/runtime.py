@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 
 from markdown_it import MarkdownIt
+from mdit_plain.renderer import RendererPlain
 from nonebot import get_driver
 from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent, MessageEvent
 from nonebot.log import logger
@@ -13,28 +14,11 @@ from .llm import AgentConfigurationError, build_chat_model, build_safeguard_mode
 from .registry import list_tools
 from .types import AgentState, ToolExecutionContext
 
-_MARKDOWN = MarkdownIt()
 
-
-# def md_to_text(content: str) -> str:
-#     tokens = _MARKDOWN.parse(content)
-#     parts: list[str] = []
-#     for token in tokens:
-#         if token.type == "inline" and token.children:
-#             inline_parts: list[str] = []
-#             for child in token.children:
-#                 if child.type in {"text", "code_inline"} and child.content:
-#                     inline_parts.append(child.content)
-#             if inline_parts:
-#                 parts.append("".join(inline_parts))
-#         elif token.type in {"code_block", "fence"} and token.content:
-#             parts.append(token.content)
-#         elif token.type in {"softbreak", "hardbreak"}:
-#             parts.append("\n")
-
-#     text = "\n".join(part.strip() for part in parts if part and part.strip())
-#     text = re.sub(r"\n{3,}", "\n\n", text)
-#     return text.strip()
+def md_to_text(content: str) -> str:
+    parser = MarkdownIt(renderer_cls=RendererPlain)
+    text = parser.render(content)
+    return text
 
 
 class AiAgentRuntime:
@@ -111,5 +95,5 @@ class AiAgentRuntime:
                 if isinstance(item, dict) and item.get("type") == "text"
             )
         logger.info(f"AI Agent 最终回复原始内容: {response_text}")
-        # response_text = md_to_text(str(response_text))
+        response_text = md_to_text(str(response_text))
         return response_text or "回复生成失败了，请稍后再试。"

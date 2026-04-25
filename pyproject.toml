@@ -20,6 +20,7 @@ dependencies = [
     "kbinxml",
     "langchain-core",
     "langchain-openrouter",
+    "langchain-deepseek-v4",
     "langgraph",
     "markdown-it-py",
     "moviepy",

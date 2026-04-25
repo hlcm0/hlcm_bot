@@ -4,10 +4,12 @@ from pydantic import BaseModel, Field
 class AiAgentConfig(BaseModel):
     enabled: bool = False
     api_key: str = ""
+    provider: str = "openrouter"
     model: str = ""
     safeguard_model: str = ""
     base_url: str = "https://openrouter.ai/api/v1"
-    temperature: float = 0.3
+    temperature: float = 1.0
+    safeguard_temperature: float = 1.0
     max_tokens: int = 1024
     system_prompt: str = (
         "你是一个 AI 助手，你的名字叫草莓。"
