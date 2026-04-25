@@ -23,6 +23,7 @@ dependencies = [
     "langchain-deepseek-v4",
     "langgraph",
     "markdown-it-py",
+    "mdit-plain",
     "moviepy",
     "numpy",
     "onnxruntime",
