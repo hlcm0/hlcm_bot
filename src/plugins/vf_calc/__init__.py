@@ -41,7 +41,7 @@ async def vf_calc_tool_handler(
 
 register_tool(
     ToolSpec(
-        name="vf_calc.calculate",
+        name="vf_calc_calculate",
         description="\
             计算 SOUND VOLTEX 单曲 VF，返回不同通关状态下的 VF 结果,\
                 PUC(perfect ultimate chain)代表满分通关，\
